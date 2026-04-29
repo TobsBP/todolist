@@ -26,7 +26,7 @@ public class Auth extends OncePerRequestFilter {
     
         var servletPath = request.getServletPath();
          
-        if (servletPath.equals("/tasks/task")) {
+        if (servletPath.startsWith("/tasks/")) {
             //Take user info
             var auth = request.getHeader("Authorization");
             
