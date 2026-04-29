@@ -1,5 +1,7 @@
 package br.com.tobias.todolist.task;
 
+import java.util.UUID;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -7,7 +9,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import br.com.tobias.todolist.user.IUserRepository;
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/tasks")
@@ -16,18 +18,12 @@ public class TaskController {
     @Autowired
     private ITaskRepository taskRepository;
 
-    @Autowired
-    private IUserRepository userRepository;
-    
     @PostMapping("/task")
-    public ResponseEntity<?> create(@RequestBody TaskModel taskModel) {
+    public ResponseEntity<?> create(@RequestBody TaskModel taskModel, HttpServletRequest request) {
         
-        var userID = taskModel.getUserID();
-        var user = this.userRepository.findById(userID);
+        var userID = request.getAttribute("userID");
         
-        if (user.isEmpty()) {
-            return ResponseEntity.status(400).body("This userID doesn't exist!");
-        }
+        taskModel.setUserID((UUID) userID);
         
         this.taskRepository.save(taskModel);  
         

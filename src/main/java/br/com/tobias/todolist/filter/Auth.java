@@ -53,6 +53,7 @@ public class Auth extends OncePerRequestFilter {
                 var authenticated = BCrypt.verifyer().verify(pass.toCharArray(), user.getPassword());
                 
                 if (authenticated.verified) {
+                    request.setAttribute("userID", user.getId());
                    	filterChain.doFilter(request, response);
                 } else {
                     response.sendError(401, "Wrong password!");
