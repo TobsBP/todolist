@@ -3,7 +3,6 @@ package br.com.tobias.todolist.filter;
 import java.io.IOException;
 import java.util.Base64;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -16,51 +15,49 @@ import jakarta.servlet.http.HttpServletResponse;
 
 @Component
 public class Auth extends OncePerRequestFilter {
-    
-    @Autowired
-    IUserRepository userRepository;
 
-	@Override
-	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-    	throws ServletException, IOException {
-    
-        var servletPath = request.getServletPath();
-         
-        if (servletPath.startsWith("/tasks/")) {
-            //Take user info
-            var auth = request.getHeader("Authorization");
-            
-            // Remove Basic word and get only the password
-            var password = auth.substring("Basic".length()).trim();
-            
-            // Decode the password
-            byte[] authDecode = Base64.getDecoder().decode(password);
-            
-            var userAuth = new String(authDecode);
-            
-            // Split the words to get user and pass
-            String[] creadentials = userAuth.split(":");
-            
-            String username = creadentials[0];
-            String pass = creadentials[1];
-            
-            var user = userRepository.findByUsername(username);
-            
-            // Check if the user extis
-            if (user == null){
-                response.sendError(401, "User not authenticated!");
-            } else {
-                var authenticated = BCrypt.verifyer().verify(pass.toCharArray(), user.getPassword());
-                
-                if (authenticated.verified) {
-                    request.setAttribute("userID", user.getId());
-                   	filterChain.doFilter(request, response);
-                } else {
-                    response.sendError(401, "Wrong password!");
-                }
-            }
-        } else {
-           	filterChain.doFilter(request, response);
+    private final IUserRepository userRepository;
+
+    public Auth(IUserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+
+        if (!request.getServletPath().startsWith("/tasks/")) {
+            filterChain.doFilter(request, response);
+            return;
         }
-	}
+
+        var credentials = extractCredentials(request);
+        if (credentials == null) {
+            response.sendError(401, "Authorization header missing or malformed");
+            return;
+        }
+
+        var user = userRepository.findByUsername(credentials[0]);
+        if (user == null) {
+            response.sendError(401, "User not authenticated!");
+            return;
+        }
+
+        var result = BCrypt.verifyer().verify(credentials[1].toCharArray(), user.getPassword());
+        if (!result.verified) {
+            response.sendError(401, "Wrong password!");
+            return;
+        }
+
+        request.setAttribute("userID", user.getId());
+        filterChain.doFilter(request, response);
+    }
+
+    private String[] extractCredentials(HttpServletRequest request) {
+        var auth = request.getHeader("Authorization");
+        if (auth == null || !auth.startsWith("Basic ")) return null;
+
+        var encoded = auth.substring("Basic ".length()).trim();
+        var decoded = new String(Base64.getDecoder().decode(encoded));
+        return decoded.split(":", 2);
+    }
 }

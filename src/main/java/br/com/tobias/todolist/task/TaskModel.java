@@ -28,4 +28,31 @@ public class TaskModel {
 
     @CreationTimestamp
     private LocalDateTime createAt;
+    
+    public void validateDates() {
+        var now = LocalDateTime.now();
+
+        if (startAt == null || endAt == null) {
+            throw new IllegalArgumentException("Dates cannot be null");
+        }
+
+        if (now.isAfter(startAt) || now.isAfter(endAt)) {
+            throw new IllegalArgumentException("Dates must be in the future");
+        }
+
+        if (startAt.isAfter(endAt)) {
+            throw new IllegalArgumentException("Start date must be before end date");
+        }
+    }
+
+    public void validateTitle() {
+        if (title != null && title.length() > 30) {
+            throw new IllegalArgumentException("Title must be 30 characters or less");
+        }
+    }
+
+    public void validate() {
+        validateDates();
+        validateTitle();
+    }
 }
