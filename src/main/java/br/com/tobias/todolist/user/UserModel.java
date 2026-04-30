@@ -19,10 +19,11 @@ public class UserModel {
     @GeneratedValue(generator = "UUID")
     private UUID id;
 
-    @Column(unique = true) 
+    @Column(unique = true)
     private String username;
     private String name;
     private String password;
+    private String theme;
 
     @CreationTimestamp
     private LocalDateTime createdAt;
