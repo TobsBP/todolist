@@ -1,5 +1,6 @@
 package br.com.tobias.todolist.task;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,6 +28,9 @@ public class TaskService {
     public TaskModel update(UUID id, TaskModel taskModel, UUID userID) {
         taskModel.setId(id);
         taskModel.setUserID(userID);
+        if (taskModel.isCompleted() && taskModel.getFinishedAt() == null) {
+            taskModel.setFinishedAt(LocalDateTime.now());
+        }
         return taskRepository.save(taskModel);
     }
 }

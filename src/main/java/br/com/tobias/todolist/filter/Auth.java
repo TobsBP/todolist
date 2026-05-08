@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import at.favre.lib.crypto.bcrypt.BCrypt;
+import br.com.tobias.todolist.auth.JwtProvider;
 import br.com.tobias.todolist.user.IUserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -17,49 +18,72 @@ import jakarta.servlet.http.HttpServletResponse;
 public class Auth extends OncePerRequestFilter {
 
     private final IUserRepository userRepository;
+    private final JwtProvider jwtProvider;
 
-    public Auth(IUserRepository userRepository) {
+    public Auth(IUserRepository userRepository, JwtProvider jwtProvider) {
         this.userRepository = userRepository;
+        this.jwtProvider = jwtProvider;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
         var path = request.getServletPath();
-        var isProtected = path.startsWith("/tasks/") || path.startsWith("/users/me");
+        var isProtected = path.startsWith("/tasks/") || path.startsWith("/users/me") || path.startsWith("/analytics");
         if (!isProtected || request.getMethod().equalsIgnoreCase("OPTIONS")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        var credentials = extractCredentials(request);
-        if (credentials == null) {
-            response.sendError(401, "Authorization header missing or malformed");
+        var auth = request.getHeader("Authorization");
+        if (auth == null) {
+            response.sendError(401, "Authorization header missing");
             return;
         }
 
-        var user = userRepository.findByUsername(credentials[0]);
-        if (user == null) {
-            response.sendError(401, "User not authenticated!");
+        if (auth.startsWith("Bearer ")) {
+            var token = auth.substring("Bearer ".length()).trim();
+            var userID = jwtProvider.verify(token);
+            if (userID == null) {
+                response.sendError(401, "Invalid or expired token");
+                return;
+            }
+            request.setAttribute("userID", userID);
+            filterChain.doFilter(request, response);
             return;
         }
 
-        var result = BCrypt.verifyer().verify(credentials[1].toCharArray(), user.getPassword());
-        if (!result.verified) {
-            response.sendError(401, "Wrong password!");
+        if (auth.startsWith("Basic ")) {
+            var credentials = extractBasicCredentials(auth);
+            if (credentials == null) {
+                response.sendError(401, "Authorization header malformed");
+                return;
+            }
+
+            var user = userRepository.findByUsername(credentials[0]);
+            if (user == null) {
+                response.sendError(401, "User not authenticated!");
+                return;
+            }
+
+            var result = BCrypt.verifyer().verify(credentials[1].toCharArray(), user.getPassword());
+            if (!result.verified) {
+                response.sendError(401, "Wrong password!");
+                return;
+            }
+
+            request.setAttribute("userID", user.getId());
+            filterChain.doFilter(request, response);
             return;
         }
 
-        request.setAttribute("userID", user.getId());
-        filterChain.doFilter(request, response);
+        response.sendError(401, "Unsupported authorization scheme");
     }
 
-    private String[] extractCredentials(HttpServletRequest request) {
-        var auth = request.getHeader("Authorization");
-        if (auth == null || !auth.startsWith("Basic ")) return null;
-
+    private String[] extractBasicCredentials(String auth) {
         var encoded = auth.substring("Basic ".length()).trim();
         var decoded = new String(Base64.getDecoder().decode(encoded));
-        return decoded.split(":", 2);
+        var parts = decoded.split(":", 2);
+        return parts.length == 2 ? parts : null;
     }
 }

@@ -7,6 +7,7 @@ import jakarta.persistence.Id;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.Data;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 
 @Data
@@ -25,6 +26,11 @@ public class TaskModel {
     private String description;
     private LocalDateTime startAt;
     private LocalDateTime endAt;
+
+    @ColumnDefault("false")
+    private boolean completed;
+
+    private LocalDateTime finishedAt;
 
     @CreationTimestamp
     private LocalDateTime createAt;
